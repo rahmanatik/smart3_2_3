@@ -174,8 +174,9 @@ if(isset($success))
 								?>
 							</td>
 
-							<td><?php echo form_input(array('name'=>'discount', 'class'=>'form-control input-sm', 'value'=>to_decimals($item['discount'], 0), 'tabindex'=>++$tabindex, 'onClick'=>'this.select();'));?></td>
-							<td>
+							<!--TODO:: 'value'=>to_decimals($item['discount'], 0) to 'value'=>to_currency_no_money($item['discount']) -->
+                            <td><?php echo form_input(array('name'=>'discount', 'class'=>'form-control input-sm', 'value'=>to_currency_no_money($item['discount']), 'tabindex'=>++$tabindex, 'onClick'=>'this.select();'));?></td>
+                            <td>
 								<?php
 								if($item['item_type'] == ITEM_AMOUNT_ENTRY)
 								{

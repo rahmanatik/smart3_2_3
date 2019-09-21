@@ -92,8 +92,9 @@
 			{
 			?>
 				<tr>
-					<td colspan="3" style="font-weight: bold;"> <?php echo number_format($item['discount'], 0) . " " . $this->lang->line("sales_discount_included")?> </td>
-				</tr>
+					<!--TODO:: echo number_format($item['discount'], 0) to echo to_currency($item['discount'])-->
+                    <td colspan="3" style="font-weight: bold;"> <?php echo to_currency($item['discount']) . " " . $this->lang->line("sales_discount_included")?> </td>
+                </tr>
 			<?php
 			}
 			?>

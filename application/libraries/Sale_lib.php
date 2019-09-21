@@ -1245,6 +1245,8 @@ class Sale_lib
 
 	public function get_item_discount($quantity, $price, $discount_percentage)
 	{
+	    //TODO:: returning discount_percentage as discount
+        return $discount_percentage;
 		$total = bcmul($quantity, $price);
 		$discount_fraction = bcdiv($discount_percentage, 100);
 
