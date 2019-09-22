@@ -119,7 +119,7 @@
 						<span class="icon-bar"></span>
 					</button>
 			
-					<a class="navbar-brand hidden-sm" href="<?php echo site_url(); ?>">OSPOS</a>
+					<a class="navbar-brand hidden-sm" href="<?php echo site_url(); ?>">Sultan Mart</a>
 				</div>
 
 				<div class="navbar-collapse collapse">
