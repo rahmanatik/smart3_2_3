@@ -3,7 +3,7 @@
 $lang["customers_available_points"] = "Available Points";
 $lang["rewards_package"] = "Rewards";
 $lang["rewards_remaining_balance"] = "Reward Points remaining value is ";
-$lang["sales_add_payment"] = "Add Payment";
+$lang["sales_add_payment"] = "Add Payment(F10)";
 $lang["sales_amount_due"] = "Amount Due";
 $lang["sales_amount_tendered"] = "Amount Tendered";
 $lang["sales_cancel_sale"] = "Cancel";
@@ -16,7 +16,7 @@ $lang["sales_check_balance"] = "Check remainder";
 $lang["sales_check_filter"] = "Check";
 $lang["sales_comment"] = "Comment";
 $lang["sales_comments"] = "Comments";
-$lang["sales_complete_sale"] = "Complete";
+$lang["sales_complete_sale"] = "Complete(F11)";
 $lang["sales_confirm_cancel_sale"] = "Are you sure you want to clear this sale? All items will cleared.";
 $lang["sales_confirm_delete"] = "Are you sure you want to delete the selected Sale(s)?";
 $lang["sales_confirm_restore"] = "Are you sure you want to restore the selected Sale(s)?";
