@@ -88,7 +88,7 @@ if(isset($success))
 					<label for="item" class='control-label'><?php echo $this->lang->line('sales_find_or_scan_item_or_receipt'); ?>(F2)</label>
 				</li>
 				<li class="pull-left">
-					<?php echo form_input(array('name'=>'item', 'id'=>'item', 'class'=>'form-control input-sm', 'size'=>'50', 'tabindex'=>++$tabindex)); ?>
+					<?php echo form_input(array('name'=>'item', 'id'=>'item', 'class'=>'form-control input-sm', 'size'=>'50', 'tabindex'=>++$tabindex, 'placeholder'=>'Start typing Item Name or scan Barcode...')); ?>
 					<span class="ui-helper-hidden-accessible" role="status"></span>
 				</li>
 				<li class="pull-right">
@@ -401,11 +401,11 @@ if(isset($success))
 			<table class="sales_table_100" id="payment_totals">
 				<tr>
 					<th style="width: 55%;"><?php echo $this->lang->line('sales_payments_total');?></th>
-					<th style="width: 45%; text-align: right;"><?php echo to_currency($payments_total); ?></th>
+					<th style="width: 45%; text-align: right; font-size: 20px;"><span id="payments_total_div"><?php echo to_currency($payments_total) ?></span></th>
 				</tr>
 				<tr>
 					<th style="width: 55%;"><?php echo $this->lang->line('sales_amount_due');?></th>
-					<th style="width: 45%; text-align: right; color:red; font-size: 20px;"><span id="sale_amount_due"><?php echo to_currency($amount_due); ?></span></th>
+					<th style="width: 45%; text-align: right; font-size: 20px;"><span id="sale_amount_due"><?php echo to_currency($amount_due); ?></span></th>
 				</tr>
 			</table>
 
@@ -612,7 +612,7 @@ $(document).ready(function()
 
 	$('#item').blur(function()
 	{
-		$(this).val("<?php echo $this->lang->line('sales_start_typing_item_name'); ?>");
+		//$(this).val("<?php echo $this->lang->line('sales_start_typing_item_name'); ?>");
 	});
 
 	$("#item").autocomplete(
@@ -873,6 +873,10 @@ $(document).ready(function()
       event.preventDefault();
       $("#quantity_1").focus().select();
     });
+
+    //set green color for receiving and red for giving
+    <?php echo $payments_total ?> < 0 ? $("#payments_total_div").css("color", "red") : $("#payments_total_div").css("color", "green");
+    <?php echo $amount_due ?> < 0 ? $("#sale_amount_due").css("color", "red") : $("#sale_amount_due").css("color", "green");
 
 });
 
