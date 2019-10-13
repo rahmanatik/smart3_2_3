@@ -38,7 +38,7 @@ class Sale extends CI_Model
 
 		$decimals = totals_decimals();
 
-		$sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased * (1 - sales_items.discount_percent / 100)';
+		$sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased';// * (1 - sales_items.discount_percent / 100)';
 		$tax = 'ROUND(IFNULL(SUM(sales_items_taxes.tax), 0), ' . $decimals . ')';
 
 		if($this->config->item('tax_included'))
@@ -152,7 +152,7 @@ class Sale extends CI_Model
 
 		$decimals = totals_decimals();
 
-		$sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased * (1 - sales_items.discount_percent / 100)';
+		$sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased';// * (1 - sales_items.discount_percent / 100)';
 		$sale_cost = 'SUM(sales_items.item_cost_price * sales_items.quantity_purchased)';
 		$tax = 'IFNULL(SUM(sales_items_taxes.tax), 0)';
 
@@ -1131,7 +1131,7 @@ class Sale extends CI_Model
 
 		$decimals = totals_decimals();
 
-		$sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased * (1 - sales_items.discount_percent / 100)';
+		$sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased';// * (1 - sales_items.discount_percent / 100)';
 		$sale_cost = 'SUM(sales_items.item_cost_price * sales_items.quantity_purchased)';
 		$tax = 'IFNULL(SUM(sales_items_taxes.tax), 0)';
 
