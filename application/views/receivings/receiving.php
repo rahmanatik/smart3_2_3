@@ -56,6 +56,18 @@ if (isset($success))
 					}
 				}
 				?>
+				//it come
+				<?php
+                if($this->Employee->has_grant('reports_sales', $this->session->userdata('person_id')))
+                {
+                ?>
+                    <li class="pull-right">
+                        <?php echo anchor($controller_name."/manage", '<span class="glyphicon glyphicon-list-alt">&nbsp</span>' . $this->lang->line('sales_takings'),
+                                    array('class'=>'btn btn-primary btn-sm', 'id'=>'sales_takings_button', 'title'=>$this->lang->line('sales_takings'))); ?>
+                    </li>
+                <?php
+                }
+                ?>
 			</ul>
 		</div>
 	<?php echo form_close(); ?>

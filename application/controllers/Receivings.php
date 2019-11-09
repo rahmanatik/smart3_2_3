@@ -17,6 +17,91 @@ class Receivings extends Secure_Controller
 		$this->_reload();
 	}
 
+	public function manage()
+    {
+        $person_id = $this->session->userdata('person_id');
+
+        if(!$this->Employee->has_grant('reports_sales', $person_id))
+        {
+            redirect('no_access/sales/reports_sales');
+        }
+        else
+        {
+            $data['table_headers'] = get_sales_manage_table_headers();
+
+            // filters that will be loaded in the multiselect dropdown
+            if($this->config->item('invoice_enable') == TRUE)
+            {
+                $data['filters'] = array('only_cash' => $this->lang->line('sales_cash_filter'),
+                    'only_due' => $this->lang->line('sales_due_filter'),
+                    'only_check' => $this->lang->line('sales_check_filter'),
+                    'only_debit' => $this->lang->line('sales_debit_filter'),
+                    'only_credit' => $this->lang->line('sales_credit_filter'),
+                    'only_invoices' => $this->lang->line('sales_invoice_filter'));
+            }
+            else
+            {
+                $data['filters'] = array('only_cash' => $this->lang->line('sales_cash_filter'),
+                    'only_due' => $this->lang->line('sales_due_filter'),
+                    'only_check' => $this->lang->line('sales_check_filter'));
+            }
+
+            $this->load->view('sales/manage', $data);
+        }
+    }
+
+    public function get_row($row_id)
+    	{
+    		$sale_info = $this->Receiving->get_info($row_id)->row();
+    		$data_row = $this->xss_clean(get_sale_data_row($sale_info));
+
+    		echo json_encode($data_row);
+    	}
+
+    	public function search()
+    	{
+    		$search = $this->input->get('search');
+    		$limit = $this->input->get('limit');
+    		$offset = $this->input->get('offset');
+    		$sort = $this->input->get('sort');
+    		$order = $this->input->get('order');
+
+    		$filters = array('sale_type' => 'all',
+    						 'location_id' => 'all',
+    						 'start_date' => $this->input->get('start_date'),
+    						 'end_date' => $this->input->get('end_date'),
+    						 'only_cash' => FALSE,
+    						 'only_due' => FALSE,
+    						 'only_check' => FALSE,
+    						 'only_debit' => FALSE,
+    						 'only_credit' => FALSE,
+    						 'only_invoices' => $this->config->item('invoice_enable') && $this->input->get('only_invoices'),
+    						 'is_valid_receipt' => $this->Receiving->is_valid_receipt($search));
+
+    		// check if any filter is set in the multiselect dropdown
+    		$filledup = array_fill_keys($this->input->get('filters'), TRUE);
+    		$filters = array_merge($filters, $filledup);
+
+    		$sales = $this->Receiving->search($search, $filters, $limit, $offset, $sort, $order);
+    		$total_rows = $this->Receiving->get_found_rows($search, $filters);
+    		$payments = $this->Receiving->get_payments_summary($search, $filters);
+    		$payment_summary = $this->xss_clean(get_sales_manage_payments_summary($payments, $sales));
+
+    		$data_rows = array();
+    		foreach($sales->result() as $sale)
+    		{
+    			$data_rows[] = $this->xss_clean(get_sale_data_row($sale));
+    		}
+
+    		if($total_rows > 0)
+    		{
+    			$data_rows[] = $this->xss_clean(get_sale_data_last_row($sales));
+    		}
+
+    		echo json_encode(array('total' => $total_rows, 'rows' => $data_rows, 'payment_summary' => $payment_summary));
+    	}
+
+
 	public function item_search()
 	{
 		$suggestions = $this->Item->get_search_suggestions($this->input->get('term'), array('search_custom' => FALSE, 'is_deleted' => FALSE), TRUE);

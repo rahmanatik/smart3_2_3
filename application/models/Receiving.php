@@ -284,5 +284,319 @@ class Receiving extends CI_Model
 			)'
 		);
 	}
+
+	//For receivings/manage
+	/**
+     * Get number of rows for the takings (receivings/manage) view
+     */
+    public function get_found_rows($search, $filters)
+    {
+        return $this->search($search, $filters, 0, 0, 'receivings.receiving_time', 'desc', TRUE);
+    }
+
+    /**
+     * Get the sales data for the takings (receivings/manage) view
+     */
+    public function search($search, $filters, $rows = 0, $limit_from = 0, $sort = 'receivings.receiving_time', $order = 'desc', $count_only = FALSE)
+    {
+        // Pick up only non-suspended records
+        $where = '';
+
+        if(empty($this->config->item('date_or_time_format')))
+        {
+            $where .= 'DATE(receivings.receiving_time) BETWEEN ' . $this->db->escape($filters['start_date']) . ' AND ' . $this->db->escape($filters['end_date']);
+        }
+        else
+        {
+            $where .= 'receivings.receiving_time BETWEEN ' . $this->db->escape(rawurldecode($filters['start_date'])) . ' AND ' . $this->db->escape(rawurldecode($filters['end_date']));
+        }
+
+        // NOTE: temporary tables are created to speed up searches due to the fact that they are ortogonal to the main query
+        // create a temporary table to contain all the payments per sale item
+        $this->db->query('CREATE TEMPORARY TABLE IF NOT EXISTS ' . $this->db->dbprefix('sales_payments_temp') .
+            ' (PRIMARY KEY(sale_id), INDEX(sale_id))
+            (
+                SELECT payments.sale_id AS sale_id,
+                    IFNULL(SUM(payments.payment_amount), 0) AS sale_payment_amount,
+                    GROUP_CONCAT(CONCAT(payments.payment_type, " ", payments.payment_amount) SEPARATOR ", ") AS payment_type
+                FROM ' . $this->db->dbprefix('sales_payments') . ' AS payments
+                INNER JOIN ' . $this->db->dbprefix('sales') . ' AS sales
+                    ON receivings.sale_id = payments.sale_id
+                WHERE ' . $where . '
+                GROUP BY sale_id
+            )'
+        );
+
+        $decimals = totals_decimals();
+
+        $sale_price = 'sales_items.item_unit_price * sales_items.quantity_purchased';// * (1 - sales_items.discount_percent / 100)';
+        $sale_cost = 'SUM(sales_items.item_cost_price * sales_items.quantity_purchased)';
+        $tax = 'IFNULL(SUM(sales_items_taxes.tax), 0)';
+
+        if($this->config->item('tax_included'))
+        {
+            $sale_total = 'ROUND(SUM(' . $sale_price . '), ' . $decimals . ')';
+            $sale_subtotal = $sale_total . ' - ' . $tax;
+        }
+        else
+        {
+            $sale_subtotal = 'ROUND(SUM(' . $sale_price . '), ' . $decimals . ')';
+            $sale_total = $sale_subtotal . ' + ' . $tax;
+        }
+
+        // create a temporary table to contain all the sum of taxes per sale item
+        $this->db->query('CREATE TEMPORARY TABLE IF NOT EXISTS ' . $this->db->dbprefix('sales_items_taxes_temp') .
+            ' (INDEX(sale_id), INDEX(item_id))
+            (
+                SELECT sales_items_taxes.sale_id AS sale_id,
+                    sales_items_taxes.item_id AS item_id,
+                    sales_items_taxes.line AS line,
+                    SUM(sales_items_taxes.item_tax_amount) as tax
+                FROM ' . $this->db->dbprefix('sales_items_taxes') . ' AS sales_items_taxes
+                INNER JOIN ' . $this->db->dbprefix('sales') . ' AS sales
+                    ON receivings.sale_id = sales_items_taxes.sale_id
+                INNER JOIN ' . $this->db->dbprefix('sales_items') . ' AS sales_items
+                    ON sales_items.sale_id = sales_items_taxes.sale_id AND sales_items.line = sales_items_taxes.line
+                WHERE ' . $where . '
+                GROUP BY sale_id, item_id, line
+            )'
+        );
+
+        // get_found_rows case
+        if($count_only == TRUE)
+        {
+            $this->db->select('COUNT(DISTINCT receivings.sale_id) as count');
+        }
+        else
+        {
+            $this->db->select('
+                    receivings.sale_id AS sale_id,
+                    MAX(DATE(receivings.sale_time)) AS sale_date,
+                    MAX(receivings.sale_time) AS sale_time,
+                    MAX(receivings.invoice_number) AS invoice_number,
+                    MAX(receivings.quote_number) AS quote_number,
+                    SUM(sales_items.quantity_purchased) AS items_purchased,
+                    MAX(CONCAT(customer_p.first_name, " ", customer_p.last_name)) AS customer_name,
+                    MAX(suppliers.company_name) AS company_name,
+                    ' . "
+                    IFNULL($sale_subtotal, $sale_total) AS subtotal,
+                    $tax AS tax,
+                    IFNULL($sale_total, $sale_subtotal) AS total,
+                    $sale_cost AS cost,
+                    (IFNULL($sale_subtotal, $sale_total) - $sale_cost) AS profit,
+                    IFNULL($sale_total, $sale_subtotal) AS amount_due,
+                    MAX(payments.sale_payment_amount) AS amount_tendered,
+                    (MAX(payments.sale_payment_amount) - IFNULL($sale_total, $sale_subtotal)) AS change_due,
+                    " . '
+                    MAX(payments.payment_type) AS payment_type
+            ');
+        }
+
+        $this->db->from('sales_items AS sales_items');
+        $this->db->join('sales AS sales', 'sales_items.sale_id = receivings.sale_id', 'inner');
+        $this->db->join('people AS customer_p', 'receivings.customer_id = customer_p.person_id', 'LEFT');
+        $this->db->join('suppliers AS customer', 'receivings.customer_id = suppliers.person_id', 'LEFT');
+        $this->db->join('sales_payments_temp AS payments', 'receivings.sale_id = payments.sale_id', 'LEFT OUTER');
+        $this->db->join('sales_items_taxes_temp AS sales_items_taxes',
+            'sales_items.sale_id = sales_items_taxes.sale_id AND sales_items.item_id = sales_items_taxes.item_id AND sales_items.line = sales_items_taxes.line',
+            'LEFT OUTER');
+
+        $this->db->where($where);
+
+        if(!empty($search))
+        {
+            if($filters['is_valid_receipt'] != FALSE)
+            {
+                $pieces = explode(' ', $search);
+                $this->db->where('receivings.sale_id', $pieces[1]);
+            }
+            else
+            {
+                $this->db->group_start();
+                    // customer last name
+                    $this->db->like('customer_p.last_name', $search);
+                    // customer first name
+                    $this->db->or_like('customer_p.first_name', $search);
+                    // customer first and last name
+                    $this->db->or_like('CONCAT(customer_p.first_name, " ", customer_p.last_name)', $search);
+                    // customer company name
+                    $this->db->or_like('suppliers.company_name', $search);
+                $this->db->group_end();
+            }
+        }
+
+        if($filters['location_id'] != 'all')
+        {
+            $this->db->where('sales_items.item_location', $filters['location_id']);
+        }
+
+        if($filters['only_invoices'] != FALSE)
+        {
+            $this->db->where('receivings.invoice_number IS NOT NULL');
+        }
+
+        if($filters['only_cash'] != FALSE)
+        {
+            $this->db->group_start();
+                $this->db->like('payments.payment_type', $this->lang->line('sales_cash'));
+                $this->db->or_where('payments.payment_type IS NULL');
+            $this->db->group_end();
+        }
+
+        if($filters['only_due'] != FALSE)
+        {
+            $this->db->like('payments.payment_type', $this->lang->line('sales_due'));
+        }
+
+        if($filters['only_check'] != FALSE)
+        {
+            $this->db->like('payments.payment_type', $this->lang->line('sales_check'));
+        }
+
+        if($filters['only_debit'] != FALSE)
+        {
+            $this->db->like('payments.payment_type', $this->lang->line('sales_debit'));
+        }
+
+        if($filters['only_credit'] != FALSE)
+        {
+            $this->db->like('payments.payment_type', $this->lang->line('sales_credit'));
+        }
+
+        // get_found_rows case
+        if($count_only == TRUE)
+        {
+            return $this->db->get()->row()->count;
+        }
+
+        $this->db->group_by('receivings.sale_id');
+
+        // order by sale time by default
+        $this->db->order_by($sort, $order);
+
+        if($rows > 0)
+        {
+            $this->db->limit($rows, $limit_from);
+        }
+
+        return $this->db->get();
+    }
+
+    /**
+     * Get the payment summary for the takings (receivings/manage) view
+     */
+    public function get_payments_summary($search, $filters)
+    {
+        // get payment summary
+        $this->db->select('payment_type, COUNT(payment_amount) AS count, SUM(payment_amount) AS payment_amount');
+        $this->db->from('receivings AS receivings');
+        $this->db->join('sales_payments', 'sales_payments.sale_id = receivings.sale_id');
+        $this->db->join('people AS customer_p', 'receivings.customer_id = customer_p.person_id', 'LEFT');
+        $this->db->join('suppliers AS customer', 'receivings.customer_id = suppliers.person_id', 'LEFT');
+
+        if(empty($this->config->item('date_or_time_format')))
+        {
+            $this->db->where('DATE(receivings.sale_time) BETWEEN ' . $this->db->escape($filters['start_date']) . ' AND ' . $this->db->escape($filters['end_date']));
+        }
+        else
+        {
+            $this->db->where('receivings.sale_time BETWEEN ' . $this->db->escape(rawurldecode($filters['start_date'])) . ' AND ' . $this->db->escape(rawurldecode($filters['end_date'])));
+        }
+
+        if(!empty($search))
+        {
+            if($filters['is_valid_receipt'] != FALSE)
+            {
+                $pieces = explode(' ',$search);
+                $this->db->where('receivings.sale_id', $pieces[1]);
+            }
+            else
+            {
+                $this->db->group_start();
+                    // customer last name
+                    $this->db->like('customer_p.last_name', $search);
+                    // customer first name
+                    $this->db->or_like('customer_p.first_name', $search);
+                    // customer first and last name
+                    $this->db->or_like('CONCAT(customer_p.first_name, " ", customer_p.last_name)', $search);
+                    // customer company name
+                    $this->db->or_like('suppliers.company_name', $search);
+                $this->db->group_end();
+            }
+        }
+
+        if($filters['sale_type'] == 'sales')
+        {
+            $this->db->where('receivings.sale_status = ' . COMPLETED . ' AND payment_amount > 0');
+        }
+        elseif($filters['sale_type'] == 'quotes')
+        {
+            $this->db->where('receivings.sale_status = ' . SUSPENDED . ' AND receivings.quote_number IS NOT NULL');
+        }
+        elseif($filters['sale_type'] == 'returns')
+        {
+            $this->db->where('receivings.sale_status = ' . COMPLETED . ' AND payment_amount < 0');
+        }
+        elseif($filters['sale_type'] == 'all')
+        {
+            $this->db->where('receivings.sale_status = ' . COMPLETED);
+        }
+
+        if($filters['only_invoices'] != FALSE)
+        {
+            $this->db->where('invoice_number IS NOT NULL');
+        }
+
+        if($filters['only_cash'] != FALSE)
+        {
+            $this->db->like('payment_type', $this->lang->line('sales_cash'));
+        }
+
+        if($filters['only_due'] != FALSE)
+        {
+            $this->db->like('payment_type', $this->lang->line('sales_due'));
+        }
+
+        if($filters['only_check'] != FALSE)
+        {
+            $this->db->like('payment_type', $this->lang->line('sales_check'));
+        }
+
+        if($filters['only_debit'] != FALSE)
+        {
+            $this->db->like('payment_type', $this->lang->line('sales_debit'));
+        }
+
+        if($filters['only_credit'] != FALSE)
+        {
+            $this->db->like('payment_type', $this->lang->line('sales_credit'));
+        }
+
+        $this->db->group_by('payment_type');
+
+        $payments = $this->db->get()->result_array();
+
+        // consider Gift Card as only one type of payment and do not show "Gift Card: 1, Gift Card: 2, etc." in the total
+        $gift_card_count = 0;
+        $gift_card_amount = 0;
+        foreach($payments as $key=>$payment)
+        {
+            if(strstr($payment['payment_type'], $this->lang->line('sales_giftcard')) != FALSE)
+            {
+                $gift_card_count  += $payment['count'];
+                $gift_card_amount += $payment['payment_amount'];
+
+                // remove the "Gift Card: 1", "Gift Card: 2", etc. payment string
+                unset($payments[$key]);
+            }
+        }
+
+        if($gift_card_count > 0)
+        {
+            $payments[] = array('payment_type' => $this->lang->line('sales_giftcard'), 'count' => $gift_card_count, 'payment_amount' => $gift_card_amount);
+        }
+
+        return $payments;
+    }
 }
 ?>
